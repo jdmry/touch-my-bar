@@ -24,6 +24,27 @@ crossed-out speaker, which looks identical in both states.
 **Feedback** — an optional tap through the trackpad's Taptic Engine, an
 optional click sound, and an on-screen HUD for brightness and volume.
 
+## Install
+
+```sh
+brew tap jdmry/tap
+brew trust jdmry/tap
+brew install --cask touch-my-bar
+xattr -dr com.apple.quarantine "/Applications/Touch My Bar.app"
+```
+
+Two of those steps deserve a moment's thought. `brew trust` is Homebrew
+asking whether you trust this tap. `xattr -dr com.apple.quarantine` removes
+the flag Gatekeeper uses to block apps Apple has not notarized — this one is
+not, so without it macOS simply refuses to open it. Both are you deciding to
+trust a build Apple has not checked. The source is here, and the build below
+is two commands, if you would rather not.
+
+(Homebrew's `--no-quarantine` did this during install; it was removed in
+Homebrew 7.)
+
+Universal binary, Intel and Apple silicon. Needs macOS 13+ and a Touch Bar.
+
 ## Build and run
 
 ```bash
