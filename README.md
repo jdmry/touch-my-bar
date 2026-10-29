@@ -52,6 +52,14 @@ actions — Quit, Hide, New Window.
 **Out of your way.** Lives in the menu bar, starts at login, one tap to turn
 off when you want the normal bar back.
 
+## Why another one?
+
+[Pock](https://github.com/pigigaldi/Pock) carried me for a long time and I
+still rate it. This exists because there were a few things I kept wanting and
+never quite got: my Dock in its real order including the apps that aren't
+running, volume and brightness pinned somewhere they never move, and a tap I
+can actually feel.
+
 ## Requirements
 
 A Mac with a Touch Bar (MacBook Pro 2016–2022) running macOS 13 or later.
@@ -80,5 +88,5 @@ to confirm there's nothing nasty inside.
 [GPL-3.0](LICENSE) licensed — free to use and free to read, and anyone who
 ships a modified version has to keep their source open too.
 
-How it works, and the undocumented Apple interfaces it leans on, are written
-up in [DEVELOPMENT.md](DEVELOPMENT.md).
+Built with Swift and AppKit. The code is commented throughout, including the
+undocumented Apple interfaces it leans on and why each one is there.
