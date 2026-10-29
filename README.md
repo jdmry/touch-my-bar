@@ -33,6 +33,15 @@ xattr -dr com.apple.quarantine "/Applications/Touch My Bar.app"
 Finally, turn on the Control Strip in **System Settings → Keyboard → Touch Bar
 Settings**, and tap the icon on the right of your bar.
 
+## Update
+
+```sh
+brew upgrade --cask touch-my-bar
+xattr -dr com.apple.quarantine "/Applications/Touch My Bar.app"
+```
+
+The second line again, yes — a fresh download arrives freshly quarantined.
+
 ## What you get
 
 **Your Dock, where your thumb already is.** The same apps, in the same order,
