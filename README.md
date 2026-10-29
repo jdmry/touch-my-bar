@@ -52,14 +52,6 @@ actions — Quit, Hide, New Window.
 **Out of your way.** Lives in the menu bar, starts at login, one tap to turn
 off when you want the normal bar back.
 
-## Why another one?
-
-[Pock](https://github.com/pigigaldi/Pock) carried me for a long time and I
-still rate it. This exists because there were a few things I kept wanting and
-never quite got: my Dock in its real order including the apps that aren't
-running, volume and brightness pinned somewhere they never move, and a tap I
-can actually feel.
-
 ## Requirements
 
 A Mac with a Touch Bar (MacBook Pro 2016–2022) running macOS 13 or later.
