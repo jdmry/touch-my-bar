@@ -1,28 +1,16 @@
-# Touch My Bar
+<h1 align="center">Touch My Bar</h1>
 
-A menu bar app that takes over the Touch Bar system-wide and fills it with
-something more useful than what the app in front happens to offer.
+<p align="center">
+  <b>Your Dock, your volume, your brightness — on the Touch Bar, in every app.</b>
+</p>
 
-Built for a 13" MacBook Pro (M1, `a Touch Bar MacBook Pro`) on macOS 27.
+![Touch My Bar on a MacBook Pro Touch Bar](docs/touch-bar.png)
 
-## What it does
+The Touch Bar spends most of its life showing whatever the app in front
+decided you needed. Touch My Bar takes it back and puts something there you'll
+actually use: every app in your Dock, and the controls you reach for all day.
 
-The bar is split: apps on the left, system controls pinned right.
-
-**Dock** — your real Dock, in its real order. Pinned apps appear whether or
-not they are running, dimmed when they are not. Tap launches or brings to
-front, exactly like clicking the Dock. The tile breathes while an app starts,
-since the bar cannot bounce. Press and hold opens that app's actions — Quit,
-Hide, New Window — so quitting takes a deliberate second tap rather than
-happening the moment a resting hand lingers.
-
-**Brightness and volume** — always in the same place, never scrolled away.
-Steps of 1/16 to match the hardware keys, hold to repeat, and either volume
-key unmutes. The mute button says MUTE or UNMUTE rather than showing a
-crossed-out speaker, which looks identical in both states.
-
-**Feedback** — an optional tap through the trackpad's Taptic Engine, an
-optional click sound, and an on-screen HUD for brightness and volume.
+It doesn't change when you switch apps. It's just always there.
 
 ## Install
 
@@ -33,101 +21,50 @@ brew install --cask touch-my-bar
 xattr -dr com.apple.quarantine "/Applications/Touch My Bar.app"
 ```
 
-Two of those steps deserve a moment's thought. `brew trust` is Homebrew
-asking whether you trust this tap. `xattr -dr com.apple.quarantine` removes
-the flag Gatekeeper uses to block apps Apple has not notarized — this one is
-not, so without it macOS simply refuses to open it. Both are you deciding to
-trust a build Apple has not checked. The source is here, and the build below
-is two commands, if you would rather not.
+Then turn on the Control Strip in **System Settings → Keyboard → Touch Bar
+Settings**, and tap the icon on the right of your bar.
 
-(Homebrew's `--no-quarantine` did this during install; it was removed in
-Homebrew 7.)
+## What you get
 
-Universal binary, Intel and Apple silicon. Needs macOS 13+ and a Touch Bar.
+**Your Dock, where your thumb already is.** The same apps, in the same order,
+running or not. Tap to switch or launch — exactly what clicking the Dock does.
+The icon pulses while an app starts up, so you know the tap landed.
 
-## Build and run
+**Volume and brightness that never move.** Pinned to the right, in every app,
+in the same place every time. Hold to run them up or down. One button says
+MUTE or UNMUTE, so you never have to work out which state you're in.
 
-```bash
-./Scripts/make-app.sh          # or: ./Scripts/make-app.sh release
-open "build/Touch My Bar.app"
+**A tap you can feel.** Optional haptic feedback and a click sound, because a
+glass bar gives you nothing back on its own.
+
+**Quit without reaching for the mouse.** Press and hold any app for its
+actions — Quit, Hide, New Window.
+
+**Out of your way.** Lives in the menu bar, starts at login, one tap to turn
+off when you want the normal bar back.
+
+## Requirements
+
+A Mac with a Touch Bar (MacBook Pro 2016–2022) running macOS 13 or later.
+Universal — Intel and Apple silicon.
+
+## Before you install
+
+Those last two commands aren't normal, and you should know what they do.
+
+`brew trust` is Homebrew asking whether you trust this tap. `xattr -dr
+com.apple.quarantine` removes the flag macOS uses to block apps Apple hasn't
+notarized — this one isn't, so without it macOS simply won't open it.
+
+Both come down to trusting a build Apple hasn't checked. That's a real ask, so
+the source is all here and you can build it yourself in two commands instead:
+
+```sh
+git clone https://github.com/jdmry/touch-my-bar && cd touch-my-bar
+./Scripts/make-app.sh release && open build
 ```
 
-Quit from the menu bar icon. Quitting removes the Control Strip item; force
-quitting can leave it behind until the next login.
+---
 
-### Touch Bar settings
-
-System Settings → Keyboard → Touch Bar Settings: set **Touch Bar shows** to
-"App Controls" and keep **Show Control Strip** on. Without the Control Strip
-there is no icon to toggle the bar with, though the menu bar item still works.
-
-## Adding a mode
-
-Conform to `BarMode` and add an instance to `modes` in `AppDelegate`:
-
-```swift
-final class MyMode: NSObject, BarMode {
-    static let identifier = "mine"
-    let title = "My Mode"
-    var view: NSView { myView }
-
-    func activate()   { /* start timers and observers */ }
-    func deactivate() { /* stop them */ }
-}
-```
-
-`activate`/`deactivate` bracket the time a mode is actually on the bar, so an
-inactive mode costs nothing. The mode list only appears in the menu once
-there is more than one.
-
-## About the private APIs
-
-Owning the Touch Bar across every app is not something the public SDK allows,
-and neither are several of the things on it.
-
-| Symbol | Framework | For |
-| --- | --- | --- |
-| `+[NSTouchBar presentSystemModalTouchBar:placement:systemTrayItemIdentifier:]` | AppKit | Owning the bar |
-| `+[NSTouchBar dismissSystemModalTouchBar:]` | AppKit | Releasing it |
-| `+[NSTouchBarItem addSystemTrayItem:]` | AppKit | Control Strip icon |
-| `DFRElementSetControlStripPresenceForIdentifier` | DFRFoundation | Showing that icon |
-| `DFRSystemModalShowsCloseBoxWhenFrontMost` | DFRFoundation | Suppressing the close box |
-| `DisplayServicesGet/SetBrightness` | DisplayServices | Brightness |
-| `MTActuatorCreateFromDeviceID` / `Open` / `Actuate` | MultitouchSupport | Haptics |
-
-All verified present on macOS 27. The Touch Bar symbols are
-checked at runtime via `TouchBarController.isSupported`, brightness and
-haptics are resolved with `dlsym` and degrade to disabled buttons rather than
-a crash. Consequences: not App Store distributable, and any macOS update can
-break it.
-
-Volume deliberately uses public CoreAudio rather than synthesised media keys,
-which would require an Accessibility grant.
-
-## Things that did not work
-
-**The system HUD.** `OSDManager` in OSD.framework is the real thing behind
-the brightness and volume overlays, and the call matches its signature
-exactly, but on macOS 27 it does nothing from an unprivileged process —
-`OSDUIHelper` is never even launched. The HUD here is drawn by the app.
-
-**Now Playing.** `MediaRemote` exports everything needed, but the
-now-playing info is entitlement-gated and comes back empty.
-
-**Haptics on the bar itself.** There is no actuator behind the Touch Bar; the
-only Taptic Engine is under the trackpad, so a tap is felt in the palm rest.
-The actuator accepts pattern ids 1-6, 15 and 16 — 15 and 16 return success
-while being too faint to notice — and nothing lands harder than 6, which is
-why there are two strength settings rather than three.
-
-**Notes' icon.** It renders at 1x and returns an empty bitmap at 2x, so its
-tile came out blank on a 2x panel. Of the apps checked it is the
-only one, but the fallback in `DockMode.barIcon(for:)` is general: draw at
-2x, check for pixels, drop to 1x if there are none.
-
-## Ideas not built yet
-
-- Audio output switcher next to the volume keys
-- Context-aware bar: different controls per frontmost app
-- Quotes, clipboard history, user-defined shortcut buttons
-- System stats, next calendar event
+How it works, and the undocumented Apple interfaces it leans on, are written
+up in [DEVELOPMENT.md](DEVELOPMENT.md).
