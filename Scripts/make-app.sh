@@ -9,17 +9,28 @@
 set -euo pipefail
 
 CONFIG="${1:-debug}"
+# Overridden by Scripts/release.sh; the default keeps dev builds honest
+# about being unreleased.
+VERSION="${TMB_VERSION:-0.0.0-dev}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/build/Touch My Bar.app"
-BIN="$(swift build --package-path "$ROOT" -c "$CONFIG" --show-bin-path)/TouchMyBar"
+# Release builds go universal: most Touch Bar Macs are Intel (every model
+# from 2016-2020 bar one), so an arm64-only build would exclude most of
+# the hardware this app exists for.
+ARCHS=()
+if [[ "$CONFIG" == "release" ]]; then
+    ARCHS=(--arch arm64 --arch x86_64)
+fi
 
-swift build --package-path "$ROOT" -c "$CONFIG"
+BIN="$(swift build --package-path "$ROOT" -c "$CONFIG" "${ARCHS[@]}" --show-bin-path)/TouchMyBar"
+
+swift build --package-path "$ROOT" -c "$CONFIG" "${ARCHS[@]}"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/TouchMyBar"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -35,7 +46,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>$VERSION</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
