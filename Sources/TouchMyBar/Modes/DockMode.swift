@@ -2,7 +2,9 @@ import AppKit
 
 /// The Dock as a row of icons: pinned apps whether or not they are running,
 /// then anything else currently open. Tap behaves like a Dock click — launch
-/// or bring to front. Press and hold quits a running app.
+/// or bring to front. Press and hold a running app opens its actions.
+///
+/// Brightness and volume stay pinned to the right through all of this.
 final class DockMode: NSObject, BarMode {
 
     static let identifier = "dock"
@@ -18,7 +20,7 @@ final class DockMode: NSObject, BarMode {
         static let buttonWidth: CGFloat = 52
         static let spacing: CGFloat = 8
         static let cornerRadius: CGFloat = 7
-        static let holdToQuit: TimeInterval = 0.6
+        static let holdForActions: TimeInterval = 0.6
         static let separatorInset: CGFloat = 10
     }
 
@@ -47,6 +49,12 @@ final class DockMode: NSObject, BarMode {
     }()
 
     private let controls = SystemControlsView()
+    private let actionRow = AppActionRow()
+
+    /// Bundle ids of apps we have asked to launch and not yet seen running.
+    /// Their tiles pulse, because the bar cannot bounce the way the Dock does
+    /// and a tap would otherwise look like it did nothing for several seconds.
+    private var launching: Set<String> = []
 
     /// Apps scroll on the left; brightness and volume stay pinned right, so
     /// they are always in the same place no matter how many apps are open.
@@ -56,10 +64,11 @@ final class DockMode: NSObject, BarMode {
         let separator = NSBox()
         separator.boxType = .separator
 
-        for subview in [scrollView, separator, controls] {
+        for subview in [scrollView, actionRow, separator, controls] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(subview)
         }
+        actionRow.isHidden = true
 
         // Controls keep their intrinsic width; the dock takes what is left.
         controls.setContentHuggingPriority(.required, for: .horizontal)
@@ -69,6 +78,12 @@ final class DockMode: NSObject, BarMode {
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.topAnchor.constraint(equalTo: container.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+
+            // The action row occupies exactly the dock's area.
+            actionRow.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            actionRow.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            actionRow.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            actionRow.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
 
             separator.leadingAnchor.constraint(equalTo: scrollView.trailingAnchor,
                                                constant: Metrics.separatorInset),
@@ -135,6 +150,11 @@ final class DockMode: NSObject, BarMode {
     @objc private func reload() {
         entries = DockModel.entries()
 
+        // Anything that made it to running is no longer launching.
+        launching = launching.filter { identifier in
+            !entries.contains { $0.bundleIdentifier == identifier && $0.isRunning }
+        }
+
         stack.arrangedSubviews.forEach {
             stack.removeArrangedSubview($0)
             $0.removeFromSuperview()
@@ -160,16 +180,20 @@ final class DockMode: NSObject, BarMode {
         let isHidden = entry.runningApplication?.isHidden ?? false
         button.alphaValue = entry.isRunning ? (isHidden ? 0.5 : 1.0) : 0.55
 
+        if let identifier = entry.bundleIdentifier, launching.contains(identifier) {
+            addLaunchPulse(to: button)
+        }
+
         if entry.runningApplication?.isActive == true {
             button.wantsLayer = true
             button.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.2).cgColor
             button.layer?.cornerRadius = Metrics.cornerRadius
         }
 
-        // Quitting something that is not running makes no sense.
+        // Quit and Hide are meaningless for an app that is not running.
         if entry.isRunning {
             let hold = NSPressGestureRecognizer(target: self, action: #selector(buttonHeld(_:)))
-            hold.minimumPressDuration = Metrics.holdToQuit
+            hold.minimumPressDuration = Metrics.holdForActions
             hold.allowedTouchTypes = [.direct]
             button.addGestureRecognizer(hold)
         }
@@ -229,6 +253,21 @@ final class DockMode: NSObject, BarMode {
         return image
     }
 
+    /// Breathes the tile while its app starts up. The Dock bounces; the bar
+    /// has no room for that, so it fades instead.
+    private func addLaunchPulse(to button: NSButton) {
+        button.wantsLayer = true
+        button.alphaValue = 1
+
+        let pulse = CABasicAnimation(keyPath: "opacity")
+        pulse.fromValue = 1.0
+        pulse.toValue = 0.3
+        pulse.duration = 0.55
+        pulse.autoreverses = true
+        pulse.repeatCount = .infinity
+        button.layer?.add(pulse, forKey: "launchPulse")
+    }
+
     // MARK: - Actions
 
     /// Same as clicking the real Dock: bring the app to the front, or launch
@@ -244,12 +283,22 @@ final class DockMode: NSObject, BarMode {
         // running: that sends the reopen event, which is what makes an app
         // with no windows open one. Plain activate() just focuses an app
         // that has nothing on screen.
+        if !entry.isRunning, let identifier = entry.bundleIdentifier {
+            launching.insert(identifier)
+            reload()
+        }
+
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
-        NSWorkspace.shared.openApplication(at: entry.url, configuration: configuration) { _, error in
-            if let error {
-                NSLog("[TouchMyBar] could not open %@: %@",
-                      entry.url.lastPathComponent, error.localizedDescription)
+        NSWorkspace.shared.openApplication(at: entry.url, configuration: configuration) { [weak self] _, error in
+            guard let error else { return }
+            NSLog("[TouchMyBar] could not open %@: %@",
+                  entry.url.lastPathComponent, error.localizedDescription)
+            // A launch that failed will never arrive, so stop waiting for it.
+            DispatchQueue.main.async {
+                guard let self, let identifier = entry.bundleIdentifier else { return }
+                self.launching.remove(identifier)
+                self.reload()
             }
         }
     }
@@ -257,9 +306,45 @@ final class DockMode: NSObject, BarMode {
     @objc private func buttonHeld(_ gesture: NSPressGestureRecognizer) {
         guard gesture.state == .began,
               let button = gesture.view as? NSButton,
-              let app = entry(at: button.tag)?.runningApplication else { return }
+              let entry = entry(at: button.tag) else { return }
 
-        app.terminate()
+        Haptics.tap()
+        showActions(for: entry)
+    }
+
+    // MARK: - Per-app actions
+
+    private func showActions(for entry: DockEntry) {
+        actionRow.present(entry) { [weak self] action, entry in
+            self?.perform(action, on: entry)
+        } onDismiss: { [weak self] in
+            self?.hideActions()
+        }
+
+        scrollView.isHidden = true
+        actionRow.isHidden = false
+    }
+
+    private func hideActions() {
+        actionRow.cancelTimeout()
+        actionRow.isHidden = true
+        scrollView.isHidden = false
+    }
+
+    private func perform(_ action: AppActionRow.Action, on entry: DockEntry) {
+        switch action {
+        case .quit:
+            entry.runningApplication?.terminate()
+        case .hide:
+            entry.runningApplication?.hide()
+        case .newWindow:
+            // Reopening an app that already has windows is how macOS asks
+            // for another one.
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            configuration.createsNewApplicationInstance = false
+            NSWorkspace.shared.openApplication(at: entry.url, configuration: configuration)
+        }
     }
 
     /// The list is rebuilt on every workspace event, so a tag captured when
