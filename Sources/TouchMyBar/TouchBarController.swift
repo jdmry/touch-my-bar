@@ -40,7 +40,7 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         DFRSystemModalShowsCloseBoxWhenFrontMost(false)
 
         let button = NSButton(
-            image: NSImage(systemSymbolName: "rectangle.grid.1x2", accessibilityDescription: "Touch My Bar")
+            image: NSImage(systemSymbolName: "rectangle.bottomthird.inset.filled", accessibilityDescription: "Touch My Bar")
                 ?? NSImage(),
             target: self,
             action: #selector(trayItemTapped)

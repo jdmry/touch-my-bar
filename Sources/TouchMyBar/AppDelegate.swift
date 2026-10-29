@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "rectangle.grid.1x2",
+        item.button?.image = NSImage(systemSymbolName: "rectangle.bottomthird.inset.filled",
                                      accessibilityDescription: "Touch My Bar")
         item.menu = makeMenu()
         statusItem = item
