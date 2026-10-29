@@ -62,15 +62,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(.separator())
         }
 
-        let refresh = NSMenuItem(title: "Refresh Dock",
-                                 action: #selector(refreshMode),
-                                 keyEquivalent: "r")
-        refresh.target = self
-        refresh.toolTip = "Rebuild the bar from the Dock as it is now."
-        menu.addItem(refresh)
-
-        menu.addItem(.separator())
-
         let haptics = NSMenuItem(title: "Haptic Feedback",
                                  action: #selector(toggleHaptics),
                                  keyEquivalent: "")
@@ -136,10 +127,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         TouchBarController.shared.setMode(mode)
         UserDefaults.standard.set(mode.identifier, forKey: Self.lastModeKey)
         refreshMenu()
-    }
-
-    @objc private func refreshMode() {
-        TouchBarController.shared.currentMode?.refresh()
     }
 
     @objc private func toggleHaptics() {

@@ -151,11 +151,6 @@ final class DockMode: NSObject, BarMode {
         dockPollTimer = nil
     }
 
-    func refresh() {
-        dockSignature = DockModel.signature()
-        reload()
-    }
-
     /// Nothing reliably announces a Dock rearrangement, so watch for one.
     /// Only a changed signature causes a rebuild — the common case is a
     /// sub-millisecond read and nothing else.
