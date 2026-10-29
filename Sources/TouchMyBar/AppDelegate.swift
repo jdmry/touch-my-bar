@@ -63,7 +63,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                 action: #selector(togglePresented),
                                 keyEquivalent: "")
         toggle.target = self
+        // Ticked means our bar is the one on screen. This was never being
+        // set, so the item always read unticked.
+        toggle.state = TouchBarController.shared.isPresented ? .on : .off
         menu.addItem(toggle)
+
+        let haptics = NSMenuItem(title: "Haptic Feedback",
+                                 action: #selector(toggleHaptics),
+                                 keyEquivalent: "")
+        haptics.target = self
+        haptics.state = Haptics.isEnabled ? .on : .off
+        // The buzz comes from the trackpad, not the bar; say so rather than
+        // leaving someone wondering why it feels like it is in the wrong place.
+        haptics.toolTip = "Tap the Taptic Engine when a bar control is used. "
+            + "The Touch Bar has no actuator, so it is felt in the trackpad."
+        menu.addItem(haptics)
+
+        let strength = NSMenuItem(title: "Haptic Strength", action: nil, keyEquivalent: "")
+        let strengthMenu = NSMenu()
+        for option in Haptics.Strength.allCases {
+            let item = NSMenuItem(title: option.title,
+                                  action: #selector(strengthSelected(_:)),
+                                  keyEquivalent: "")
+            item.target = self
+            item.tag = option.rawValue
+            item.state = Haptics.strength == option ? .on : .off
+            strengthMenu.addItem(item)
+        }
+        strength.submenu = strengthMenu
+        menu.addItem(strength)
+
+        let sound = NSMenuItem(title: "Click Sound",
+                               action: #selector(toggleSound),
+                               keyEquivalent: "")
+        sound.target = self
+        sound.state = Haptics.isSoundEnabled ? .on : .off
+        sound.toolTip = "Hearing the click does much of the work a tap would, "
+            + "given the bar itself cannot produce one."
+        menu.addItem(sound)
 
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Touch My Bar",
@@ -86,6 +123,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func select(_ mode: BarMode) {
         TouchBarController.shared.setMode(mode)
         UserDefaults.standard.set(mode.identifier, forKey: Self.lastModeKey)
+        refreshMenu()
+    }
+
+    @objc private func toggleHaptics() {
+        Haptics.isEnabled.toggle()
+        // Fire one so the setting demonstrates itself.
+        Haptics.tap()
+        refreshMenu()
+    }
+
+    @objc private func toggleSound() {
+        Haptics.isSoundEnabled.toggle()
+        if Haptics.isSoundEnabled { Haptics.tap() }
+        refreshMenu()
+    }
+
+    @objc private func strengthSelected(_ sender: NSMenuItem) {
+        guard let option = Haptics.Strength(rawValue: sender.tag) else { return }
+        Haptics.strength = option
+        // Fire one at the new setting so the choice is audible/tangible.
+        Haptics.tap()
         refreshMenu()
     }
 
