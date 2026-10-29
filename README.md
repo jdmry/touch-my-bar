@@ -77,5 +77,8 @@ to confirm there's nothing nasty inside.
 
 ---
 
-MIT licensed. How it works, and the undocumented Apple interfaces it leans on,
-are written up in [DEVELOPMENT.md](DEVELOPMENT.md).
+[GPL-3.0](LICENSE) licensed — free to use and free to read, and anyone who
+ships a modified version has to keep their source open too.
+
+How it works, and the undocumented Apple interfaces it leans on, are written
+up in [DEVELOPMENT.md](DEVELOPMENT.md).
