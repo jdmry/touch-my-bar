@@ -14,6 +14,15 @@ It doesn't change when you switch apps. It's just always there.
 
 ## Install
 
+Touch My Bar installs with [Homebrew](https://brew.sh), the package manager
+most Mac developers use. If you don't have it, paste this in Terminal first:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Then:
+
 ```sh
 brew tap jdmry/tap
 brew trust jdmry/tap
@@ -21,7 +30,7 @@ brew install --cask touch-my-bar
 xattr -dr com.apple.quarantine "/Applications/Touch My Bar.app"
 ```
 
-Then turn on the Control Strip in **System Settings → Keyboard → Touch Bar
+Finally, turn on the Control Strip in **System Settings → Keyboard → Touch Bar
 Settings**, and tap the icon on the right of your bar.
 
 ## What you get
@@ -50,21 +59,23 @@ Universal — Intel and Apple silicon.
 
 ## Before you install
 
-Those last two commands aren't normal, and you should know what they do.
+Two of those commands aren't routine. They clear two separate gates, which is
+why you need both.
 
-`brew trust` is Homebrew asking whether you trust this tap. `xattr -dr
-com.apple.quarantine` removes the flag macOS uses to block apps Apple hasn't
-notarized — this one isn't, so without it macOS simply won't open it.
+**`brew trust`** is Homebrew's gate. It won't load a cask from someone else's
+tap until you say you trust that tap. This one only lets Homebrew read the
+install recipe.
 
-Both come down to trusting a build Apple hasn't checked. That's a real ask, so
-the source is all here and you can build it yourself in two commands instead:
+**`xattr -dr com.apple.quarantine`** is Apple's gate. Anything downloaded gets
+flagged, and macOS refuses to open flagged apps that Apple hasn't notarized.
+Touch My Bar isn't notarized, so without this the app simply won't start —
+clearing Homebrew's gate does nothing about Apple's.
 
-```sh
-git clone https://github.com/jdmry/touch-my-bar && cd touch-my-bar
-./Scripts/make-app.sh release && open build
-```
+Both come down to trusting a build Apple hasn't checked. That's a real ask,
+which is why the source is all here — every line of it, for anyone who wants
+to confirm there's nothing nasty inside.
 
 ---
 
-How it works, and the undocumented Apple interfaces it leans on, are written
-up in [DEVELOPMENT.md](DEVELOPMENT.md).
+MIT licensed. How it works, and the undocumented Apple interfaces it leans on,
+are written up in [DEVELOPMENT.md](DEVELOPMENT.md).
