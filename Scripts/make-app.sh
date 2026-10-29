@@ -17,14 +17,18 @@ APP="$ROOT/build/Touch My Bar.app"
 # Release builds go universal: most Touch Bar Macs are Intel (every model
 # from 2016-2020 bar one), so an arm64-only build would exclude most of
 # the hardware this app exists for.
-ARCHS=()
+# Written without an array: macOS ships bash 3.2, where expanding an
+# empty array under `set -u` is an error, not an empty list.
 if [[ "$CONFIG" == "release" ]]; then
-    ARCHS=(--arch arm64 --arch x86_64)
+    ARCH_FLAGS="--arch arm64 --arch x86_64"
+else
+    ARCH_FLAGS=""
 fi
 
-BIN="$(swift build --package-path "$ROOT" -c "$CONFIG" "${ARCHS[@]}" --show-bin-path)/TouchMyBar"
+# Unquoted on purpose — these are separate arguments, or none at all.
+BIN="$(swift build --package-path "$ROOT" -c "$CONFIG" $ARCH_FLAGS --show-bin-path)/TouchMyBar"
 
-swift build --package-path "$ROOT" -c "$CONFIG" "${ARCHS[@]}"
+swift build --package-path "$ROOT" -c "$CONFIG" $ARCH_FLAGS
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

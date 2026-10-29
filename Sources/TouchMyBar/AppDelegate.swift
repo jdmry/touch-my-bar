@@ -22,11 +22,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         TouchBarController.shared.install()
 
+        TouchBarController.shared.present()
+
         let saved = UserDefaults.standard.string(forKey: Self.lastModeKey)
         let mode = modes.first { $0.identifier == saved } ?? modes[0]
         select(mode)
-
-        TouchBarController.shared.present()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -61,15 +61,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             menu.addItem(.separator())
         }
-
-        let toggle = NSMenuItem(title: "Show on Touch Bar",
-                                action: #selector(togglePresented),
-                                keyEquivalent: "")
-        toggle.target = self
-        // Ticked means our bar is the one on screen. This was never being
-        // set, so the item always read unticked.
-        toggle.state = TouchBarController.shared.isPresented ? .on : .off
-        menu.addItem(toggle)
 
         let refresh = NSMenuItem(title: "Refresh Dock",
                                  action: #selector(refreshMode),
@@ -174,12 +165,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleLoginItem() {
         LoginItem.setEnabled(!LoginItem.isEnabled)
-        refreshMenu()
-    }
-
-    @objc private func togglePresented() {
-        let controller = TouchBarController.shared
-        controller.isPresented ? controller.dismiss() : controller.present()
         refreshMenu()
     }
 
