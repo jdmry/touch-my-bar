@@ -64,11 +64,10 @@ final class DockMode: NSObject, BarMode {
         let separator = NSBox()
         separator.boxType = .separator
 
-        for subview in [scrollView, actionRow, separator, controls] {
+        for subview in [scrollView, separator, controls] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(subview)
         }
-        actionRow.isHidden = true
 
         // Controls keep their intrinsic width; the dock takes what is left.
         controls.setContentHuggingPriority(.required, for: .horizontal)
@@ -78,12 +77,6 @@ final class DockMode: NSObject, BarMode {
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.topAnchor.constraint(equalTo: container.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-
-            // The action row occupies exactly the dock's area.
-            actionRow.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            actionRow.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            actionRow.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            actionRow.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
 
             separator.leadingAnchor.constraint(equalTo: scrollView.trailingAnchor,
                                                constant: Metrics.separatorInset),
@@ -321,13 +314,26 @@ final class DockMode: NSObject, BarMode {
             self?.hideActions()
         }
 
+        // Added only while shown. A hidden NSView still takes part in Auto
+        // Layout — unlike an arranged subview of a stack — and this row's
+        // buttons resist compression, so leaving it in the hierarchy stole
+        // width from the controls and left a gap at the right of the bar.
+        actionRow.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(actionRow)
+        NSLayoutConstraint.activate([
+            actionRow.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            actionRow.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            actionRow.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            actionRow.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+        ])
+
         scrollView.isHidden = true
-        actionRow.isHidden = false
     }
 
     private func hideActions() {
         actionRow.cancelTimeout()
-        actionRow.isHidden = true
+        // Removing it takes its constraints with it.
+        actionRow.removeFromSuperview()
         scrollView.isHidden = false
     }
 
