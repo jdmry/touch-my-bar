@@ -10,7 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// it to appear in the menu and be selectable.
     private lazy var modes: [BarMode] = [
         DockMode(),
-        PetMode(),
     ]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -47,17 +46,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
 
-        for (index, mode) in modes.enumerated() {
-            let item = NSMenuItem(title: mode.title,
-                                  action: #selector(modeSelected(_:)),
-                                  keyEquivalent: "")
-            item.target = self
-            item.tag = index
-            item.state = mode === TouchBarController.shared.currentMode ? .on : .off
-            menu.addItem(item)
-        }
+        // With a single mode there is nothing to choose between, so the
+        // list only earns its space once there is more than one.
+        if modes.count > 1 {
+            for (index, mode) in modes.enumerated() {
+                let item = NSMenuItem(title: mode.title,
+                                      action: #selector(modeSelected(_:)),
+                                      keyEquivalent: "")
+                item.target = self
+                item.tag = index
+                item.state = mode === TouchBarController.shared.currentMode ? .on : .off
+                menu.addItem(item)
+            }
 
-        menu.addItem(.separator())
+            menu.addItem(.separator())
+        }
 
         let toggle = NSMenuItem(title: "Show on Touch Bar",
                                 action: #selector(togglePresented),
@@ -103,6 +106,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(sound)
 
         menu.addItem(.separator())
+
+        let login = NSMenuItem(title: "Start at Login",
+                               action: #selector(toggleLoginItem),
+                               keyEquivalent: "")
+        login.target = self
+        login.state = LoginItem.isEnabled ? .on : .off
+        menu.addItem(login)
+
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Touch My Bar",
                                 action: #selector(NSApplication.terminate(_:)),
                                 keyEquivalent: "q"))
@@ -144,6 +156,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Haptics.strength = option
         // Fire one at the new setting so the choice is audible/tangible.
         Haptics.tap()
+        refreshMenu()
+    }
+
+    @objc private func toggleLoginItem() {
+        LoginItem.setEnabled(!LoginItem.isEnabled)
         refreshMenu()
     }
 
