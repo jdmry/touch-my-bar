@@ -96,6 +96,14 @@ enum DockModel {
         return entries
     }
 
+    /// A cheap stand-in for "has the Dock changed?" — the pinned bundle
+    /// identifiers in order, which covers adding, removing and reordering.
+    /// Reading this costs well under a tenth of a millisecond, so it is
+    /// affordable to check on a timer.
+    static func signature() -> String {
+        pinnedApps().map { $0.bundleIdentifier ?? $0.url?.path ?? "?" }.joined(separator: "\n")
+    }
+
     // MARK: - Dock preferences
 
     private struct PinnedApp {

@@ -17,10 +17,15 @@ protocol BarMode: AnyObject {
 
     func activate()
     func deactivate()
+
+    /// Rebuild from scratch. Driven by the menu's Refresh item, for when
+    /// something changed that the mode did not notice.
+    func refresh()
 }
 
 extension BarMode {
     var identifier: String { Self.identifier }
     func activate() {}
     func deactivate() {}
+    func refresh() {}
 }

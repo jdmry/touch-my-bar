@@ -22,6 +22,9 @@ final class DockMode: NSObject, BarMode {
         static let cornerRadius: CGFloat = 7
         static let holdForActions: TimeInterval = 0.6
         static let separatorInset: CGFloat = 10
+        /// Reading the Dock's preferences costs under 0.1ms, so checking
+        /// this often is cheaper than missing a change.
+        static let dockPollInterval: TimeInterval = 2
     }
 
     private let stack: NSStackView = {
@@ -101,6 +104,10 @@ final class DockMode: NSObject, BarMode {
     private var entries: [DockEntry] = []
     private var isActive = false
 
+    /// Last seen shape of the real Dock, to spot reordering and additions.
+    private var dockSignature = ""
+    private var dockPollTimer: Timer?
+
     // MARK: - BarMode
 
     func activate() {
@@ -118,7 +125,10 @@ final class DockMode: NSObject, BarMode {
             center.addObserver(self, selector: #selector(reload), name: name, object: nil)
         }
 
-        // Rearranging the real Dock should rearrange ours.
+        // Rearranging the real Dock should rearrange ours. This
+        // notification does not appear to fire on macOS 27, so it is a
+        // fast path rather than the mechanism; the poll below is what
+        // actually catches changes.
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(reload),
@@ -126,6 +136,7 @@ final class DockMode: NSObject, BarMode {
             object: nil
         )
 
+        startPollingDock()
         reload()
         // Volume can have changed from the keyboard while we were off screen.
         controls.refresh()
@@ -136,12 +147,37 @@ final class DockMode: NSObject, BarMode {
         isActive = false
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         DistributedNotificationCenter.default().removeObserver(self)
+        dockPollTimer?.invalidate()
+        dockPollTimer = nil
+    }
+
+    func refresh() {
+        dockSignature = DockModel.signature()
+        reload()
+    }
+
+    /// Nothing reliably announces a Dock rearrangement, so watch for one.
+    /// Only a changed signature causes a rebuild — the common case is a
+    /// sub-millisecond read and nothing else.
+    private func startPollingDock() {
+        dockPollTimer?.invalidate()
+
+        let timer = Timer(timeInterval: Metrics.dockPollInterval, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            let signature = DockModel.signature()
+            guard signature != self.dockSignature else { return }
+            self.dockSignature = signature
+            self.reload()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        dockPollTimer = timer
     }
 
     // MARK: - Contents
 
     @objc private func reload() {
         entries = DockModel.entries()
+        dockSignature = DockModel.signature()
 
         // Anything that made it to running is no longer launching.
         launching = launching.filter { identifier in
