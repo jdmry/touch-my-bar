@@ -11,8 +11,30 @@ struct DockEntry {
 
     var isRunning: Bool { runningApplication != nil }
 
+    /// The app's full-colour icon, read from its bundle.
+    ///
+    /// Not NSWorkspace's: with icons set to follow the system appearance
+    /// (macOS 26 and later), that hands back the dark variant in Dark Mode —
+    /// a near-black tile that all but vanishes on the bar's black glass.
+    /// The bundle's own image is the standard one whatever the setting.
     var icon: NSImage {
-        runningApplication?.icon ?? NSWorkspace.shared.icon(forFile: url.path)
+        Self.bundleIcon(at: url)
+            ?? runningApplication?.icon
+            ?? NSWorkspace.shared.icon(forFile: url.path)
+    }
+
+    /// Bundle caches both the bundle and its images, so after the first
+    /// load this costs well under a millisecond per app.
+    private static func bundleIcon(at url: URL) -> NSImage? {
+        guard let bundle = Bundle(url: url.resolvingSymlinksInPath()) else { return nil }
+        // Asset-catalog name first (modern apps), then the classic .icns.
+        for key in ["CFBundleIconName", "CFBundleIconFile"] {
+            if let name = bundle.object(forInfoDictionaryKey: key) as? String,
+               let image = bundle.image(forResource: name) {
+                return image
+            }
+        }
+        return nil
     }
 }
 
