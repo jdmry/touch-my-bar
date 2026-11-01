@@ -4,7 +4,8 @@ import AppKit
 /// then anything else currently open. Tap behaves like a Dock click — launch
 /// or bring to front. Press and hold a running app opens its actions.
 ///
-/// Brightness and volume stay pinned to the right through all of this.
+/// The Dock shares the bar with the brightness, volume and mute controls,
+/// arranged however BarLayout says.
 final class DockMode: NSObject, BarMode {
 
     static let identifier = "dock"
@@ -22,6 +23,14 @@ final class DockMode: NSObject, BarMode {
         static let cornerRadius: CGFloat = 7
         static let holdForActions: TimeInterval = 0.6
         static let separatorInset: CGFloat = 10
+        /// Between two controls, with no rule to mark the break.
+        static let groupGap: CGFloat = 20
+        /// How much the Dock wants to be exactly as wide as its icons. Below
+        /// everything else, so it is what gives way when the bar runs short
+        /// — and below fitting-size compression, so the bar's fitting width
+        /// stays what it was before the Dock could size itself.
+        static let dockFitPriority = NSLayoutConstraint.Priority(
+            NSLayoutConstraint.Priority.fittingSizeCompression.rawValue - 1)
         /// Reading the Dock's preferences costs under 0.1ms, so checking
         /// this often is cheaper than missing a change.
         static let dockPollInterval: TimeInterval = 2
@@ -33,6 +42,9 @@ final class DockMode: NSObject, BarMode {
         stack.alignment = .centerY
         stack.spacing = Metrics.spacing
         stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+        // Wins over the Dock's pull towards its icons' width, so the tiles
+        // never spread out when something else widens the scroll view.
+        stack.setHuggingPriority(.defaultHigh, for: .horizontal)
         return stack
     }()
 
@@ -51,7 +63,7 @@ final class DockMode: NSObject, BarMode {
         return scrollView
     }()
 
-    private let controls = SystemControlsView()
+    private let controls = SystemControls()
     private let actionRow = AppActionRow()
 
     /// Bundle ids of apps we have asked to launch and not yet seen running.
@@ -59,46 +71,28 @@ final class DockMode: NSObject, BarMode {
     /// and a tap would otherwise look like it did nothing for several seconds.
     private var launching: Set<String> = []
 
-    /// Apps scroll on the left; brightness and volume stay pinned right, so
-    /// they are always in the same place no matter how many apps are open.
-    private lazy var container: NSView = {
-        let container = NSView()
-
-        let separator = NSBox()
-        separator.boxType = .separator
-
-        for subview in [scrollView, separator, controls] {
-            subview.translatesAutoresizingMaskIntoConstraints = false
-            container.addSubview(subview)
-        }
-
-        // Controls keep their intrinsic width; the dock takes what is left.
-        controls.setContentHuggingPriority(.required, for: .horizontal)
-        controls.setContentCompressionResistancePriority(.required, for: .horizontal)
-
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            scrollView.topAnchor.constraint(equalTo: container.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-
-            separator.leadingAnchor.constraint(equalTo: scrollView.trailingAnchor,
-                                               constant: Metrics.separatorInset),
-            separator.widthAnchor.constraint(equalToConstant: 1),
-            separator.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
-            separator.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
-
-            controls.leadingAnchor.constraint(equalTo: separator.trailingAnchor,
-                                              constant: Metrics.separatorInset),
-            controls.trailingAnchor.constraint(equalTo: container.trailingAnchor,
-                                               constant: -Metrics.separatorInset),
-            controls.topAnchor.constraint(equalTo: container.topAnchor),
-            controls.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-        ])
-
-        return container
-    }()
+    private let container = NSView()
+    private var layoutConstraints: [NSLayoutConstraint] = []
+    private var separators: [NSView] = []
+    private var layoutObserver: NSObjectProtocol?
 
     var view: NSView { container }
+
+    override init() {
+        super.init()
+        applyLayout()
+        layoutObserver = NotificationCenter.default.addObserver(
+            forName: BarLayout.didChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.applyLayout()
+        }
+    }
+
+    deinit {
+        if let layoutObserver {
+            NotificationCenter.default.removeObserver(layoutObserver)
+        }
+    }
 
     /// Parallel to the tiles in `stack`: index i's button acts on entries[i].
     private var entries: [DockEntry] = []
@@ -166,6 +160,144 @@ final class DockMode: NSObject, BarMode {
         }
         RunLoop.main.add(timer, forMode: .common)
         dockPollTimer = timer
+    }
+
+    // MARK: - Layout
+
+    /// Arranges the bar per BarLayout.current: left sections packed from the
+    /// left edge, right ones from the right, the gap between them flexible.
+    ///
+    /// The Dock sizes to its icons rather than filling the bar, which is
+    /// what lets it sit on either side; it only starts to scroll once the
+    /// controls and the gap have nothing left to give.
+    private func applyLayout() {
+        // The action row is pinned to the Dock, which is about to move.
+        hideActions()
+
+        NSLayoutConstraint.deactivate(layoutConstraints)
+        layoutConstraints = []
+        separators = []
+        container.subviews.forEach { $0.removeFromSuperview() }
+
+        let layout = BarLayout.current
+        var left = withSeparators(views(for: layout.left))
+        var right = withSeparators(views(for: layout.right))
+
+        // Across the gap the rule stays with the control rather than the
+        // Dock, so it marks where the controls begin instead of floating
+        // halfway along the bar.
+        if let last = left.last, let first = right.first {
+            if last === scrollView {
+                right.insert(makeSeparator(), at: 0)
+            } else if first === scrollView {
+                left.append(makeSeparator())
+            }
+        }
+
+        var constraints: [NSLayoutConstraint] = [
+            scrollView.widthAnchor.constraint(equalTo: stack.widthAnchor)
+                .withPriority(Metrics.dockFitPriority),
+        ]
+
+        for view in left + right {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(view)
+
+            if isSeparator(view) {
+                constraints += [
+                    view.widthAnchor.constraint(equalToConstant: 1),
+                    view.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
+                    view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
+                ]
+            } else if view === scrollView {
+                constraints += [
+                    view.topAnchor.constraint(equalTo: container.topAnchor),
+                    view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+                ]
+            } else {
+                constraints.append(view.centerYAnchor.constraint(equalTo: container.centerYAnchor))
+            }
+        }
+
+        // Left side, leading edge first.
+        for (index, view) in left.enumerated() {
+            if index == 0 {
+                constraints.append(view.leadingAnchor.constraint(
+                    equalTo: container.leadingAnchor, constant: edgeInset(view)))
+            } else {
+                let previous = left[index - 1]
+                constraints.append(view.leadingAnchor.constraint(
+                    equalTo: previous.trailingAnchor, constant: gap(previous, view)))
+            }
+        }
+
+        // Right side, trailing edge first.
+        for (index, view) in right.enumerated().reversed() {
+            if index == right.count - 1 {
+                constraints.append(view.trailingAnchor.constraint(
+                    equalTo: container.trailingAnchor, constant: -edgeInset(view)))
+            } else {
+                let next = right[index + 1]
+                constraints.append(view.trailingAnchor.constraint(
+                    equalTo: next.leadingAnchor, constant: -gap(view, next)))
+            }
+        }
+
+        // The flexible space. With one side empty it is the far edge that
+        // stops the other side running off the bar.
+        switch (left.last, right.first) {
+        case let (last?, first?):
+            constraints.append(first.leadingAnchor.constraint(
+                greaterThanOrEqualTo: last.trailingAnchor, constant: gap(last, first)))
+        case let (last?, nil):
+            constraints.append(last.trailingAnchor.constraint(
+                lessThanOrEqualTo: container.trailingAnchor, constant: -edgeInset(last)))
+        case let (nil, first?):
+            constraints.append(first.leadingAnchor.constraint(
+                greaterThanOrEqualTo: container.leadingAnchor, constant: edgeInset(first)))
+        case (nil, nil):
+            break
+        }
+
+        NSLayoutConstraint.activate(constraints)
+        layoutConstraints = constraints
+    }
+
+    private func views(for sections: [BarLayout.Section]) -> [NSView] {
+        sections.compactMap { $0 == .dock ? scrollView : controls.view(for: $0) }
+    }
+
+    /// A rule between the Dock and any control beside it, as the bar has
+    /// always had. Controls next to each other are told apart by a gap.
+    private func withSeparators(_ views: [NSView]) -> [NSView] {
+        var result: [NSView] = []
+        for view in views {
+            if let previous = result.last, previous === scrollView || view === scrollView {
+                result.append(makeSeparator())
+            }
+            result.append(view)
+        }
+        return result
+    }
+
+    private func makeSeparator() -> NSView {
+        let separator = NSBox()
+        separator.boxType = .separator
+        separators.append(separator)
+        return separator
+    }
+
+    private func isSeparator(_ view: NSView) -> Bool {
+        separators.contains { $0 === view }
+    }
+
+    private func gap(_ a: NSView, _ b: NSView) -> CGFloat {
+        isSeparator(a) || isSeparator(b) ? Metrics.separatorInset : Metrics.groupGap
+    }
+
+    /// The Dock's tiles carry their own inset; controls need one added.
+    private func edgeInset(_ view: NSView) -> CGFloat {
+        view === scrollView ? 0 : Metrics.separatorInset
     }
 
     // MARK: - Contents
@@ -349,6 +481,10 @@ final class DockMode: NSObject, BarMode {
         // Layout — unlike an arranged subview of a stack — and this row's
         // buttons resist compression, so leaving it in the hierarchy stole
         // width from the controls and left a gap at the right of the bar.
+        //
+        // Pinned to the Dock, whose width is only a preference: the row
+        // widens it into the flexible space when the Dock is short of
+        // apps, and narrows back when it goes.
         actionRow.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(actionRow)
         NSLayoutConstraint.activate([
@@ -389,5 +525,12 @@ final class DockMode: NSObject, BarMode {
     private func entry(at index: Int) -> DockEntry? {
         guard entries.indices.contains(index) else { return nil }
         return entries[index]
+    }
+}
+
+private extension NSLayoutConstraint {
+    func withPriority(_ priority: NSLayoutConstraint.Priority) -> NSLayoutConstraint {
+        self.priority = priority
+        return self
     }
 }

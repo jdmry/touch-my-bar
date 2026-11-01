@@ -48,9 +48,15 @@ The second line again, yes — a fresh download arrives freshly quarantined.
 running or not. Tap to switch or launch — exactly what clicking the Dock does.
 The icon pulses while an app starts up, so you know the tap landed.
 
-**Volume and brightness that never move.** Pinned to the right, in every app,
-in the same place every time. Hold to run them up or down. One button says
-MUTE or UNMUTE, so you never have to work out which state you're in.
+**Volume and brightness that never move.** Pinned where you put them, in
+every app, in the same place every time. Hold to run them up or down. One
+button says MUTE or UNMUTE, so you never have to work out which state you're
+in.
+
+**Arranged your way.** Prefer volume on the left, or the Dock on the right?
+**Customize Bar…** in the menu bar lets you drag the Dock, brightness, volume
+and mute into any order, and move the flexible space to choose what hugs the
+left end of the bar and what hugs the right.
 
 **A tap you can feel.** Optional haptic feedback and a click sound, because a
 glass bar gives you nothing back on its own.

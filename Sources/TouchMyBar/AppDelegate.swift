@@ -62,6 +62,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(.separator())
         }
 
+        let customize = NSMenuItem(title: "Customize Bar…",
+                                   action: #selector(customizeBar),
+                                   keyEquivalent: ",")
+        customize.target = self
+        menu.addItem(customize)
+
+        menu.addItem(.separator())
+
         let haptics = NSMenuItem(title: "Haptic Feedback",
                                  action: #selector(toggleHaptics),
                                  keyEquivalent: "")
@@ -127,6 +135,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         TouchBarController.shared.setMode(mode)
         UserDefaults.standard.set(mode.identifier, forKey: Self.lastModeKey)
         refreshMenu()
+    }
+
+    @objc private func customizeBar() {
+        LayoutWindowController.shared.show()
     }
 
     @objc private func toggleHaptics() {
